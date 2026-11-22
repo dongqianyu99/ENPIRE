@@ -263,6 +263,10 @@ class ReflectionConfig:
     per_seed_provider: Optional[str] = None
     per_seed_label: str = "VLM reflection (Phase A)"
     per_seed_section: str = "PER-SEED VISUAL ANALYSIS"
+    # Optional dotted path to ``f(*, ctx) -> str`` that replaces the Phase B review
+    # (the reflection strategy output, which becomes the next generator feedback).
+    # Phase A still runs; provider failures stop the iteration.
+    review_provider: Optional[str] = None
     scene_query: str = ""
     analysis_prompt: str = ""
     visual_evidence: VisualEvidenceConfig = field(default_factory=VisualEvidenceConfig)

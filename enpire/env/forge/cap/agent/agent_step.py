@@ -2192,11 +2192,20 @@ class SelfReflectionStep(AgentStep):
         if ctx.should_stop:
             return ctx
 
-        try:
-            feedback = self._strategy.reflect(ctx)
-        except Exception as e:
-            logger.warning("SelfReflectionStep: strategy failed: %s", e)
-            feedback = f"(reflection failed: {e})"
+        review_path = getattr(getattr(ctx.config, "reflection", None), "review_provider", None)
+        if review_path:
+            import importlib
+
+            module_name, _, attr = str(review_path).rpartition(".")
+            feedback = getattr(importlib.import_module(module_name), attr)(ctx=ctx)
+            if not str(feedback).strip():
+                raise RuntimeError(f"review provider {review_path} returned no text")
+        else:
+            try:
+                feedback = self._strategy.reflect(ctx)
+            except Exception as e:
+                logger.warning("SelfReflectionStep: strategy failed: %s", e)
+                feedback = f"(reflection failed: {e})"
 
         # Save raw LLM input from reflection
         llm = getattr(self._strategy, "_llm", None)
