@@ -677,7 +677,9 @@ def _build_per_seed_evidence(
         if oracle_md:
             lines.append(oracle_md.strip())
         if vlm_refl:
-            lines.append("**VLM reflection (Phase A):**")
+            refl_cfg = getattr(getattr(ctx, "config", None), "reflection", None)
+            label = getattr(refl_cfg, "per_seed_label", None) or "VLM reflection (Phase A)"
+            lines.append(f"**{label}:**")
             lines.append(vlm_refl.strip())
         if stdout_tail:
             lines.append("**stdout tail:**")

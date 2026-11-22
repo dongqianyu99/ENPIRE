@@ -254,6 +254,15 @@ class ReflectionConfig:
     cameras: List[str] = field(default_factory=lambda: ["top"])
     vlm_backend: str = "gemini"
     vlm_model: Optional[str] = None  # None → backend default
+    # Phase 5 per-seed reflection. ``per_seed_min_seeds`` is the smallest seed
+    # count that gets it (the original gate is 2). ``per_seed_provider`` is an
+    # optional dotted path to ``f(*, exec_dir, result, task, iteration, config)
+    # -> str`` that replaces the VLM call; its failures stop the iteration.
+    # ``per_seed_label`` / ``per_seed_section`` name that text downstream.
+    per_seed_min_seeds: int = 2
+    per_seed_provider: Optional[str] = None
+    per_seed_label: str = "VLM reflection (Phase A)"
+    per_seed_section: str = "PER-SEED VISUAL ANALYSIS"
     scene_query: str = ""
     analysis_prompt: str = ""
     visual_evidence: VisualEvidenceConfig = field(default_factory=VisualEvidenceConfig)

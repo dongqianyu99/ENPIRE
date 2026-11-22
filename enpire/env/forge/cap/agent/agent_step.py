@@ -1833,9 +1833,18 @@ class SubprocessExecutorStep(AgentStep):
             and not oracle_mode
             and ctx.iteration + 1 < max_iters  # no benefit on the final iter
         )
+        provider_path = getattr(reflection_cfg, "per_seed_provider", None)
+        provider = None
+        if provider_path:
+            import importlib
+
+            module_name, _, attr = str(provider_path).rpartition(".")
+            provider = getattr(importlib.import_module(module_name), attr)
+        min_seeds = int(getattr(reflection_cfg, "per_seed_min_seeds", 2) or 2)
+        provider_errors: dict[int, BaseException] = {}
         if (
-            n > 1
-            and vlm_query is not None
+            n >= min_seeds
+            and (vlm_query is not None or provider is not None)
             and session is not None
             and want_per_seed_vlm
         ):
@@ -1854,11 +1863,24 @@ class SubprocessExecutorStep(AgentStep):
                 exec_dir = session.exec_dir(ctx.iteration, r["exec_id"])
                 if exec_dir is None:
                     return None
+                seed_status = "SUCCESS" if r.get("success") else "FAIL"
+                if provider is not None:
+                    try:
+                        text = provider(
+                            exec_dir=exec_dir,
+                            result=r,
+                            task=ctx.task,
+                            iteration=ctx.iteration,
+                            config=config,
+                        )
+                    except BaseException as e:
+                        provider_errors[int(r["seed"])] = e
+                        return None
+                    return f"[seed={r['seed']} {seed_status}] {text}"
                 try:
                     import numpy as np
                     from PIL import Image
 
-                    seed_status = "SUCCESS" if r.get("success") else "FAIL"
                     oracle_block = (
                         r.get("oracle_reward_markdown", "") if inject_oracle else ""
                     )
@@ -1971,6 +1993,11 @@ class SubprocessExecutorStep(AgentStep):
 
             if _dash is not None:
                 _dash.on_reflect_end()
+            if provider_errors:
+                seed, error = next(iter(provider_errors.items()))
+                raise RuntimeError(
+                    f"Per-seed reflection provider {provider_path} failed for seed={seed}"
+                ) from error
 
             # Preserve per_seed ordering in the final list / logs, and strip
             # the ``[seed=N STATUS] `` prefix for the per-seed disk artifact
@@ -1992,7 +2019,8 @@ class SubprocessExecutorStep(AgentStep):
         # ---- Phase 6: Finalize evaluation ------------------------------
         _phase_t0 = _time.perf_counter()
         if per_seed_reflections:
-            feedback_parts.append("\n=== PER-SEED VISUAL ANALYSIS ===")
+            section = getattr(reflection_cfg, "per_seed_section", "PER-SEED VISUAL ANALYSIS")
+            feedback_parts.append(f"\n=== {section} ===")
             feedback_parts.extend(per_seed_reflections)
             feedback_parts.append(
                 f"\n=== SUMMARY: {successes}/{n} seeds succeeded. ==="
