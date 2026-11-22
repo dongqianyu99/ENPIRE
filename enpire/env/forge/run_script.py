@@ -856,10 +856,16 @@ def main(cfg: DictConfig) -> None:
         sys.stdout = tee
         builtins.print = _script_print
         with backend.exec_context(namespace, script_path):
-            exec(compile(code, str(script_path), "exec"), namespace)  # noqa: S102
-            if script_function is not None:
-                result = invoke_script_function(namespace, script_function, script_kwargs, script_path)
-                print("[run_script] return_value=" + json.dumps(result, allow_nan=False))
+            execute_isolated = getattr(backend, "execute_isolated", None)
+            if execute_isolated is None:
+                exec(compile(code, str(script_path), "exec"), namespace)  # noqa: S102
+                if script_function is not None:
+                    result = invoke_script_function(namespace, script_function, script_kwargs, script_path)
+                    print("[run_script] return_value=" + json.dumps(result, allow_nan=False))
+            else:
+                if script_function is not None:
+                    raise ValueError("Isolated script backends require a standalone policy script")
+                execute_isolated(code)
     except KeyboardInterrupt:
         print("\n[run_script] Interrupted")
         exec_error = "KeyboardInterrupt"
