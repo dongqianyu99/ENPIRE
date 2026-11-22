@@ -5,10 +5,12 @@ import asyncio
 import json
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
 import enpire.env.forge.cap.bridge.agent_bridge as agent_bridge
+from enpire.env.forge.cap.agent.llm import make_llm
 from enpire.env.forge.cap.bridge.providers.base import (
     AgentBackend,
     AgentBackendSpec,
@@ -223,6 +225,49 @@ def test_codex_backend_reads_output_file_and_emits_tool_events(
         {"tool": "get_robot_state", "input": {"camera": "top"}},
     ) in ws_manager.events
     assert ("chat_text_delta", {"text": "Final answer from Codex"}) in ws_manager.events
+
+
+def test_tool_free_codex_handles_large_events_and_uses_last_message(monkeypatch, tmp_path):
+    usage = {"input_tokens": 11, "cached_input_tokens": 3, "output_tokens": 7}
+
+    async def fake_codex(*cmd, cwd, env, **kwargs):
+        assert cmd[:4] == ("codex", "exec", "--json", "--color")
+        assert cmd[cmd.index("-m") + 1] == "gpt-6.1-sol"
+        assert 'model_reasoning_effort="high"' in cmd
+        assert Path(cmd[cmd.index("-C") + 1]) == Path(cwd)
+        assert list(Path(cwd).iterdir()) == []
+        assert {"--ephemeral", "--ignore-user-config", 'web_search="disabled"'} <= set(cmd)
+        assert "shell_tool" in [cmd[i + 1] for i, arg in enumerate(cmd) if arg == "--disable"]
+        assert not any("mcp_servers.cap-robot" in arg for arg in cmd)
+        assert env.get("CODEX_HOME") == str(tmp_path) and "OPENAI_API_KEY" not in env
+        out = Path(cmd[cmd.index("--output-last-message") + 1])
+        out.write_text("```python\nprint('final')\n```\n")
+        stdout = asyncio.StreamReader(limit=kwargs.get("limit", 64 * 1024))
+        long_event = {"type": "item.completed", "item": {"type": "agent_message", "text": "x" * 70_000}}
+        stdout.feed_data((json.dumps(long_event) + "\n").encode())
+        stdout.feed_data((json.dumps({"type": "turn.completed", "usage": usage}) + "\n").encode())
+        stdout.feed_eof()
+        process = _FakeProcess([])
+        process.stdout = stdout
+        return process
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_codex)
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "test-not-a-key")
+    config = SimpleNamespace(
+        llm=SimpleNamespace(
+            backend="bridge:openai_codex",
+            model="gpt-6.1-sol",
+            reasoning="high",
+            bridge_tools=False,
+            cap_agent_url="",
+            mcp_config_path="unused",
+        )
+    )
+    llm = make_llm(config, replace_system_prompt=True)
+
+    assert llm.generate_code("task", {}) == "print('final')"
+    assert llm.last_usage == {**usage, "model": "gpt-6.1-sol"}
 
 
 def test_agent_bridge_options_and_selected_backend_chat(

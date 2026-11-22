@@ -70,6 +70,8 @@ class LLMConfig:
 
     backend: str = "bridge:claude_code"
     model: Optional[str] = None
+    reasoning: Optional[str] = None  # None -> provider default
+    bridge_tools: bool = True  # False: tool-free Codex turns (no MCP, temp cwd, no user config)
     cap_agent_url: str = "http://localhost:8200"
     mcp_config_path: str = "cap/bridge/mcp_config.json"
 
