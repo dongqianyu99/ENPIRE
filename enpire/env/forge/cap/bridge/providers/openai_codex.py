@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -93,6 +94,7 @@ class OpenAICodexBackend(AgentBackend):
         backend="openai_codex",
         label="OpenAI Codex",
         models=(
+            "gpt-6.1-sol",
             "gpt-5.4",
             "gpt-5.4-mini",
             "gpt-5.3-codex",
@@ -117,20 +119,54 @@ class OpenAICodexBackend(AgentBackend):
         model, reasoning = self.spec.normalize(
             model=config.model, reasoning=config.reasoning
         )
-        common_config = [
-            "-c",
-            'mcp_servers.cap-robot.command="uv"',
-            "-c",
-            'mcp_servers.cap-robot.args=["run","cap/bridge/cap_mcp_server.py"]',
-            "-c",
-            f'mcp_servers.cap-robot.env.CAP_AGENT_URL="{context.cap_agent_url}"',
-        ]
+        work_dir = context.project_root
+        if config.bridge_tools:
+            common_config = [
+                "-c",
+                'mcp_servers.cap-robot.command="uv"',
+                "-c",
+                'mcp_servers.cap-robot.args=["run","cap/bridge/cap_mcp_server.py"]',
+                "-c",
+                f'mcp_servers.cap-robot.env.CAP_AGENT_URL="{context.cap_agent_url}"',
+            ]
+        else:
+            work_dir = output_file.parent
+            common_config = [
+                "--skip-git-repo-check",
+                "--ephemeral",
+                "--ignore-user-config",
+                "--ignore-rules",
+                "--strict-config",
+                "-c",
+                'approval_policy="never"',
+                "-c",
+                'web_search="disabled"',
+                "-c",
+                "mcp_servers={}",
+                "-c",
+                "project_doc_max_bytes=0",
+                "--enable",
+                "skip_host_skill_discovery",
+            ]
+            for feature in (
+                "shell_tool",
+                "unified_exec",
+                "shell_snapshot",
+                "multi_agent",
+                "multi_agent_v2",
+                "view_image",
+                "image_generation",
+                "apps",
+                "plugins",
+                "memories",
+            ):
+                common_config.extend(("--disable", feature))
         if model:
             common_config.extend(["-m", model])
         if reasoning:
             common_config.extend(["-c", f'model_reasoning_effort="{reasoning}"'])
 
-        if session_id:
+        if config.bridge_tools and session_id:
             return [
                 "codex",
                 "exec",
@@ -150,7 +186,7 @@ class OpenAICodexBackend(AgentBackend):
                 "--color",
                 "never",
                 "-C",
-                str(context.project_root),
+                str(work_dir),
                 "--output-last-message",
                 str(output_file),
                 "-s",
@@ -168,17 +204,27 @@ class OpenAICodexBackend(AgentBackend):
         system_prompt: str,
         config: AgentBridgeConfig,
         context: ProviderContext,
+        replace_system_prompt: bool = False,
     ) -> TurnResult:
+        # Codex's CLI takes a single instruction string for both prompt modes.
         wrapped_message = (
             f"[System instructions]\n\n{system_prompt}\n\n---\n\n"
             f"[User request]\n\n{message}"
         )
         full_text = ""
         saw_text_delta = False
+        last_message = ""
+        usage: dict[str, Any] | None = None
         fallback_lines: list[str] = []
+        model, _ = self.spec.normalize(model=config.model, reasoning=config.reasoning)
 
         with tempfile.TemporaryDirectory(prefix="cap-codex-bridge-") as tmpdir:
             output_file = Path(tmpdir) / "last_message.txt"
+            env = None
+            if not config.bridge_tools:
+                env = {
+                    key: os.environ[key] for key in ("HOME", "CODEX_HOME", "PATH") if key in os.environ
+                }
             cmd = self.build_command(
                 message=wrapped_message,
                 session_id=session.session_id,
@@ -193,7 +239,9 @@ class OpenAICodexBackend(AgentBackend):
                     stdin=asyncio.subprocess.DEVNULL,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    cwd=str(context.project_root),
+                    limit=1024 * 1024,  # A Codex JSON line can contain an entire policy script.
+                    cwd=str(context.project_root if config.bridge_tools else output_file.parent),
+                    env=env,
                 )
             except FileNotFoundError:
                 await ws_manager.broadcast(
@@ -251,8 +299,16 @@ class OpenAICodexBackend(AgentBackend):
                         continue
 
                     maybe_session_id = _extract_session_id(event)
-                    if maybe_session_id:
+                    if maybe_session_id and config.bridge_tools:
                         session.session_id = maybe_session_id
+
+                    if event.get("type") == "turn.completed":
+                        tokens = event.get("usage")
+                        if isinstance(tokens, dict) and all(
+                            type(tokens.get(key)) is int for key in ("input_tokens", "output_tokens")
+                        ):
+                            usage = {key: value for key, value in tokens.items() if type(value) is int}
+                            usage["model"] = model
 
                     for tool_name, tool_input in _extract_tool_uses(event):
                         session.log_tool_use(tool_name, tool_input)
@@ -269,6 +325,8 @@ class OpenAICodexBackend(AgentBackend):
                         continue
 
                     final_text = _extract_final_text(event)
+                    if final_text:
+                        last_message = final_text
                     if final_text and not saw_text_delta and not full_text:
                         full_text = final_text
                         await ws_manager.broadcast(
@@ -280,10 +338,16 @@ class OpenAICodexBackend(AgentBackend):
 
             logger.info("Codex process exited with code %s", process.returncode)
 
-            if not full_text and output_file.exists():
-                full_text = output_file.read_text(encoding="utf-8").strip()
-                if full_text:
-                    await ws_manager.broadcast("chat_text_delta", {"text": full_text})
+            if not config.bridge_tools and process.returncode != 0:
+                return TurnResult(full_text="", usage=usage)
+
+            file_text = output_file.read_text(encoding="utf-8").strip() if output_file.exists() else ""
+            if file_text:
+                if not full_text:
+                    await ws_manager.broadcast("chat_text_delta", {"text": file_text})
+                full_text = file_text
+            elif last_message and not saw_text_delta:
+                full_text = last_message
 
             if not full_text and fallback_lines:
                 full_text = "\n".join(fallback_lines).strip()
@@ -295,4 +359,4 @@ class OpenAICodexBackend(AgentBackend):
                 event = "chat_error" if process.returncode != 0 else "chat_warning"
                 await ws_manager.broadcast(event, {"error": stderr_str})
 
-        return TurnResult(full_text=full_text, session_id=session.session_id)
+        return TurnResult(full_text=full_text, session_id=session.session_id, usage=usage)

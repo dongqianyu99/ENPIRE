@@ -33,6 +33,7 @@ from enpire.env.forge.cap.bridge.providers.base import (
     AgentBridgeConfig,
     ChatSession,
     ProviderContext,
+    TurnResult,
 )
 from enpire.env.forge.cap.chat.parsing import extract_code_blocks
 
@@ -71,6 +72,7 @@ class BridgeLLMBackend(LLMBackend):
         self.last_system_prompt: str | None = None
         self.last_user_prompt: str | None = None
         self.last_response: str | None = None
+        self.last_usage: dict[str, Any] | None = None
 
     def _get_session(self) -> ChatSession:
         if self._session is None:
@@ -130,9 +132,10 @@ class BridgeLLMBackend(LLMBackend):
         logger.warning("BridgeLLMBackend: no python code block found, returning raw response")
         return self.last_response
 
-    async def _run_turn(self, prompt: str, session: ChatSession) -> Any:
+    async def _run_turn(self, prompt: str, session: ChatSession) -> TurnResult:
         ws_manager = _NullWSManager()
-        return await self._backend.run_turn(
+        self.last_usage = None
+        result = await self._backend.run_turn(
             message=prompt,
             session=session,
             ws_manager=ws_manager,
@@ -141,6 +144,8 @@ class BridgeLLMBackend(LLMBackend):
             context=self._context,
             replace_system_prompt=self._replace_system_prompt,
         )
+        self.last_usage = result.usage
+        return result
 
     def _build_prompt(self, task: str, context: dict[str, Any]) -> str:
         import json

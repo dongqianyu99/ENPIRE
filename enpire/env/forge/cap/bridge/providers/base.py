@@ -60,6 +60,7 @@ class AgentBridgeConfig:
     backend: str
     model: str | None = None
     reasoning: str | None = None
+    bridge_tools: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -122,6 +123,7 @@ class ProviderContext:
 class TurnResult:
     full_text: str
     session_id: str | None = None
+    usage: dict[str, Any] | None = None
 
 
 class AgentBackend(ABC):
@@ -137,5 +139,6 @@ class AgentBackend(ABC):
         system_prompt: str,
         config: AgentBridgeConfig,
         context: ProviderContext,
+        replace_system_prompt: bool = False,
     ) -> TurnResult:
         raise NotImplementedError

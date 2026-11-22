@@ -58,7 +58,10 @@ def make_llm(
         provider_name = backend.split(":", 1)[1]
         from enpire.env.forge.cap.bridge.providers import AgentBridgeConfig, ProviderContext
 
+        bridge_tools = getattr(cfg.llm, "bridge_tools", True)
         if provider_name == "claude_code":
+            if not bridge_tools:
+                raise ValueError("Tool-free bridge turns require bridge:openai_codex")
             from enpire.env.forge.cap.bridge.providers.claude_code import ClaudeCodeBackend
 
             provider = ClaudeCodeBackend()
@@ -72,7 +75,8 @@ def make_llm(
         bridge_cfg = AgentBridgeConfig(
             backend=provider_name,
             model=model or provider.spec.default_model,
-            reasoning=provider.spec.default_reasoning,
+            reasoning=getattr(cfg.llm, "reasoning", None) or provider.spec.default_reasoning,
+            bridge_tools=bridge_tools,
         )
         context = ProviderContext(
             project_root=project_root,
