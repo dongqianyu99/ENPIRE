@@ -57,9 +57,14 @@ def _resolve_file(path_str: str, saved_scripts_dir: Path) -> Path:
         attempts.append(p)
         return p.resolve() if p.exists() else None
 
-    # 1. Direct / absolute / ~/ — only files inside this checkout are allowed.
+    # 1. Direct / absolute / ~/ — only files inside this checkout are allowed, plus
+    # directories an operator lists in ENPIRE_SCRIPT_ROOTS (os.pathsep-separated), e.g. a
+    # run directory kept outside the checkout.
+    roots = [_REPOSITORY_ROOT] + [
+        Path(p).resolve() for p in os.environ.get("ENPIRE_SCRIPT_ROOTS", "").split(os.pathsep) if p
+    ]
     result = _try(Path(raw).expanduser())
-    if result and result.is_relative_to(_REPOSITORY_ROOT):
+    if result and any(result.is_relative_to(root) for root in roots):
         return result
 
     # 2. Repo-relative
