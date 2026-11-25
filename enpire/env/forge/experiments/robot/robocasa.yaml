@@ -1,6 +1,17 @@
 # @package _global_
+# RoboCasa365 (in-process sim) with ENPIRE's shared tool services, at the ports
+# `enpire services start` uses: SAM3 6767, cuRobo 8611, AnyGrasp 8122.
+# anygrasp_port: 0 until a licensed AnyGrasp (or a stand-in) is serving.
 robot:
   adapter:
     _target_: enpire.env.forge.cap.agent.robot_adapters.robocasa.RobocasaAdapter
   script_backend:
     _target_: enpire.env.forge.cap.agent.script_backends.RobocasaBackend
+
+runtime:
+  sam3_host: 127.0.0.1
+  sam3_port: 6767
+  curobo_host: 127.0.0.1
+  curobo_port: 8611
+  anygrasp_host: 127.0.0.1
+  anygrasp_port: 0

@@ -13,6 +13,10 @@ from enpire.env.forge.cap.agent.robot_adapters.base import cfg_runtime_kwargs
 class RobocasaAdapter:
     """Create RoboCasa env/tool namespace and child run_script overrides."""
 
+    # Seeds share one SAM3 / cuRobo / AnyGrasp service each (single-GPU host),
+    # so the executor must not offset service ports per seed slot.
+    offset_service_ports = False
+
     def __init__(self, config_group: str = "robocasa") -> None:
         self.config_group = config_group
 

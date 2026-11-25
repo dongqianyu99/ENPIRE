@@ -1,4 +1,7 @@
 # @package _global_
+defaults:
+  - override /robot: robocasa
+
 name: open_cabinet
 task: "Open the cabinet door."
 max_iterations: 5

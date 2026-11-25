@@ -1,4 +1,7 @@
 # @package _global_
+defaults:
+  - override /robot: robocasa
+
 name: pick_place_sink_to_counter
 task: "Pick up the object from the sink and place it on the counter"
 max_iterations: 5

@@ -1,4 +1,7 @@
 # @package _global_
+defaults:
+  - override /robot: robocasa
+
 name: coffee_setup_mug
 task: "Set up the coffee mug for brewing."
 max_iterations: 5
