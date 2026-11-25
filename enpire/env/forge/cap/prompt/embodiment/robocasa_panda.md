@@ -8,6 +8,11 @@ exist there, and calling them raises `NameError`: `get_task_info`, `reset_env`,
 raises as well. So there are no ground-truth object poses and no success signal
 inside the script; examples below that call them describe an older runtime.
 
+- The script is evaluated on several kitchens, and the target object and container differ
+  between them (e.g. a bell pepper in one, an onion in another). The scene you may have seen
+  while writing the code is only one of them. Read the targets at run time from
+  `get_task_description()` (e.g. "Pick the onion from the sink and place it on the plate ...")
+  and pass those words to perception. Never hard-code an object name.
 - Localize objects from the cameras: `detect_objects_oneshot`, `detect_object`
   (SAM3 by default), `segment_object`, `get_camera_depth`, and the camera intrinsics
   and extrinsics.
