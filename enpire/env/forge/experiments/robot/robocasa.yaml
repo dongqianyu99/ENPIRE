@@ -15,3 +15,4 @@ runtime:
   curobo_port: 8611
   anygrasp_host: 127.0.0.1
   anygrasp_port: 0
+  bundlesdf_port: 0   # BundleSDF tracking is not used in RoboCasa
