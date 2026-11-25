@@ -11,7 +11,7 @@ supported-markers = [
 [manifest]
 overrides = [
     { name = "mink", specifier = "==0.0.12" },
-    { name = "mujoco", specifier = ">=3.5" },
+    { name = "mujoco", specifier = ">=3.5,<3.10" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pyopengl", specifier = ">=3.1.7" },
     { name = "transforms3d", specifier = ">=0.4" },
@@ -943,7 +943,7 @@ requires-dist = [
     { name = "requests", marker = "extra == 'vision-local'", specifier = ">=2.32" },
     { name = "requests", marker = "extra == 'vlm'", specifier = ">=2.32" },
     { name = "robocasa", marker = "extra == 'robocasa'", editable = "third_party/robocasa" },
-    { name = "robosuite", marker = "extra == 'robocasa'", git = "https://github.com/ARISE-Initiative/robosuite.git?rev=v1.5.2" },
+    { name = "robosuite", marker = "extra == 'robocasa'", git = "https://github.com/ARISE-Initiative/robosuite.git?rev=6c10ef24a4bb52f59199976125060ce793470e6e" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.9" },
     { name = "scipy", marker = "extra == 'calibration'", specifier = ">=1.15" },
     { name = "scipy", marker = "extra == 'cap'", specifier = ">=1.15" },
@@ -2000,7 +2000,7 @@ wheels = [
 
 [[package]]
 name = "mujoco"
-version = "3.10.0"
+version = "3.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "absl-py" },
@@ -2009,10 +2009,10 @@ dependencies = [
     { name = "numpy" },
     { name = "pyopengl" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a2/3b/c76837b7fdb007f7605ff783689a0bd23a5a49b065928bec2f1fa7ea3d67/mujoco-3.10.0.tar.gz", hash = "sha256:c9e8d5d87d82204ed5bccc87d843c0a53e75aaf381de2938ec46d04f1ac6e24e", size = 1094987, upload-time = "2026-06-22T17:40:59.904Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bc/f6/325fa0c1a1d63b1bb6852e265fb8d7fd8a88ddcd3580dc153e1dceb197dd/mujoco-3.9.0.tar.gz", hash = "sha256:0a1ca878c4a80893251420037a0583252d1356a0cc8d661268627c674c7835f7", size = 923500, upload-time = "2026-05-27T14:49:48.52Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/05/19/a8a560f29f7f0137da6d41d633bc892a9e8ebc36af64c31a3db5882d26d8/mujoco-3.10.0-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:c0eff9fb64c39c21f5e29f39996c152ed9a2a5c783818b524c77abf41f6e5751", size = 19654107, upload-time = "2026-06-22T17:40:07.594Z" },
-    { url = "https://files.pythonhosted.org/packages/b1/07/a37fc7fa55d38e9225884b80c3d241e669357e83f7e23f80b8860a7e14cd/mujoco-3.10.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:5489e18a8dd09da2dd71d28563e17889a2e5a0ad07943ebcaa1446d6c4d4e1dd", size = 20789312, upload-time = "2026-06-22T17:40:10.656Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/cd/ec99ad2065b644b51c776470083807c58c6c247eb4b9251bf509bc53e465/mujoco-3.9.0-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:a6cd6d02dfecab173de1a58cf207c8f69dd47564b0cc67ba22a6d1d346c73fee", size = 6808142, upload-time = "2026-05-27T14:49:13.163Z" },
+    { url = "https://files.pythonhosted.org/packages/cf/88/1463cb47348c40eec1960c0b598b9e9d8f7365e93e93ac59c1115791ca4c/mujoco-3.9.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3b6602cae4d9638652ab5d321db622aa59ec07cfe819d6ea3a5f55283c9147a8", size = 7310328, upload-time = "2026-05-27T14:49:14.972Z" },
 ]
 
 [[package]]
@@ -3153,7 +3153,7 @@ requires-dist = [
 [[package]]
 name = "robosuite"
 version = "1.5.2"
-source = { git = "https://github.com/ARISE-Initiative/robosuite.git?rev=v1.5.2#824ac14cefcfb7ec125fe5eb2e0bad7364466154" }
+source = { git = "https://github.com/ARISE-Initiative/robosuite.git?rev=6c10ef24a4bb52f59199976125060ce793470e6e#6c10ef24a4bb52f59199976125060ce793470e6e" }
 dependencies = [
     { name = "mink" },
     { name = "mujoco" },
