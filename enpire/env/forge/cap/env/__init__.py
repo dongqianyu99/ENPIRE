@@ -20,6 +20,8 @@ Each env implements one or more protocols from ``cap.env.base``:
 Adding a new robot or sim = one new file in this package.
 """
 
+import os
+
 from enpire.env.forge.cap.env.base import (
     EefControlProtocol,
     EnvProtocol,
@@ -40,8 +42,11 @@ def create_env(env_name: str, viewer: bool = False, **kwargs):
     """Create an env by name. This is the single entry point for all envs.
 
     Env names:
-        "yam"      — YAM MuJoCo sim
-        "yam-real" — real YAM bimanual hardware
+        "yam"                          — YAM MuJoCo sim
+        "yam-real"                     — real YAM bimanual hardware
+        "robocasa"                     — RoboCasa365 (default task)
+        "robocasa:TaskName"            — RoboCasa365 with specific task
+        "robocasa:TaskName:RobotName"  — RoboCasa365 with specific task and robot
 
     Returns an env implementing EnvProtocol (and optionally others).
     """
@@ -59,8 +64,50 @@ def create_env(env_name: str, viewer: bool = False, **kwargs):
         enable_cameras = kwargs.pop("enable_cameras", True)
         return RealYamEnv(enable_cameras=enable_cameras)
 
+    elif env_type == "robocasa":
+        from enpire.env.forge.cap.env.profile import (
+            robocasa_gr1_arms_profile,
+            robocasa_panda_omron_profile,
+        )
+        from enpire.env.forge.cap.env.robocasa import RoboCasaEnv
+
+        task = parts[1] if len(parts) > 1 else "PickPlaceCounterToCabinet"
+        robot = parts[2] if len(parts) > 2 else "PandaOmron"
+        profile = (
+            robocasa_gr1_arms_profile()
+            if robot == "GR1ArmsOnly"
+            else robocasa_panda_omron_profile()
+        )
+
+        # Explicit kwargs take precedence over env vars.
+        layout_ids = int(
+            kwargs.pop("layout_ids", None) or os.environ.get("ROBOCASA_LAYOUT_ID", -3)
+        )
+        style_ids = int(
+            kwargs.pop("style_ids", None) or os.environ.get("ROBOCASA_STYLE_ID", -3)
+        )
+        # RoboCasaEnv is pinned to OSC_POSE and does not accept controller_type.
+        kwargs.pop("controller_type", None)
+        seed_val = kwargs.pop("seed", None)
+        if seed_val is None:
+            seed_str = os.environ.get("ROBOCASA_SEED", "")
+            if seed_str:
+                seed_val = int(seed_str)
+        if seed_val is not None:
+            kwargs["seed"] = seed_val
+
+        return RoboCasaEnv(
+            env_name=task,
+            robot=robot,
+            profile=profile,
+            has_renderer=viewer,
+            layout_ids=layout_ids,
+            style_ids=style_ids,
+            **kwargs,
+        )
+
     else:
         raise ValueError(
             f"Unknown env: {env_name!r}. "
-            f"Available: yam, yam-real"
+            f"Available: yam, yam-real, robocasa, robocasa:TaskName"
         )

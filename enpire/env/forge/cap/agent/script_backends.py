@@ -118,7 +118,13 @@ class RobocasaBackend(ScriptRunnerBackend):
                 set_tool_event_hooks(on_start=None, on_end=None)
 
     def post_exec(self, exec_error: str | None, namespace: dict) -> None:
-        pass  # nothing to do for sim
+        # Canonical (script-role) namespaces omit get_task_info so the policy
+        # cannot read the oracle, but run_script._save_result reads success
+        # from namespace["get_task_info"]. The policy has finished by now, so
+        # hand the grader back the env's own success check.
+        get_task_info = getattr(self._env, "get_task_info", None)
+        if callable(get_task_info):
+            namespace["get_task_info"] = get_task_info
 
 
 # ---------------------------------------------------------------------------

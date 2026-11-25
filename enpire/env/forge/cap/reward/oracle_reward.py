@@ -412,6 +412,8 @@ def _normalize_task(env_name: str) -> str:
     parts = env_name.split(":")
     if len(parts) == 1:
         return parts[0]
+    if parts[0].lower() == "robocasa":
+        return parts[1] if len(parts) >= 2 else ""
     return parts[-1]
 
 

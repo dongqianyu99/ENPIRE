@@ -557,6 +557,7 @@ def main(cfg: DictConfig) -> None:
 
     # --- Seed ---
     if cfg.env.seed is not None:
+        os.environ["ROBOCASA_SEED"] = str(cfg.env.seed)
         print(f"[run_script] Seed   : {cfg.env.seed}")
 
     # --- Plumb remote-service config into env vars ---

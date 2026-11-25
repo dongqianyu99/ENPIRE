@@ -826,6 +826,17 @@ class SubprocessExecutorStep(AgentStep):
             else True
         )
 
+        # RoboCasa: fixed evaluation episodes from cap/assets/robocasa_40_seeds.txt
+        # (each line "<seed> <layout_id> <style_id>"). Job i uses row i (mod file
+        # length), so every iteration runs the same kitchens regardless of n_seeds.
+        _eval_seeds: list[tuple[int, int, int]] = []
+        _seeds_file = _ROOT_PATH / "cap" / "assets" / "robocasa_40_seeds.txt"
+        if str(env_name).startswith("robocasa") and _seeds_file.exists():
+            for line in _seeds_file.read_text().splitlines():
+                parts = line.split()
+                if len(parts) == 3:
+                    _eval_seeds.append((int(parts[0]), int(parts[1]), int(parts[2])))
+
         _n_gpus: int = 0
         if n_seeds > 1 and os.environ.get("MUJOCO_GL", "egl") == "egl":
             _cfg_gpus = exec_cfg.n_gpus if exec_cfg else 0
@@ -875,7 +886,10 @@ class SubprocessExecutorStep(AgentStep):
             # venv and would fall back to `.venv/`. sys.executable points at
             # the already-activated venv's Python, so the child reuses the
             # exact same environment.
-            job_seed, job_layout, job_style = seed, None, None
+            if _eval_seeds:
+                job_seed, job_layout, job_style = _eval_seeds[i % len(_eval_seeds)]
+            else:
+                job_seed, job_layout, job_style = seed, None, None
 
             cmd = [
                 sys.executable,

@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from enpire.env.forge.cap.agent.robot_adapters.base import RobotAdapter, cfg_select
+from enpire.env.forge.cap.agent.robot_adapters.robocasa import RobocasaAdapter
 from enpire.env.forge.cap.agent.robot_adapters.study import StudyAdapter
 
 
@@ -21,6 +22,8 @@ def adapter_for_env(env_name: str | None) -> RobotAdapter:
         raise NotImplementedError(
             "Real-YAM hardware deploy is not available in this sim-only (ENPIRE) build."
         )
+    if name == "robocasa" or name.startswith("robocasa:"):
+        return RobocasaAdapter()
     return StudyAdapter()
 
 
@@ -37,6 +40,7 @@ def get_robot_adapter(cfg: Any | None) -> RobotAdapter:
 
 
 __all__ = [
+    "RobocasaAdapter",
     "RobotAdapter",
     "StudyAdapter",
     "adapter_for_env",

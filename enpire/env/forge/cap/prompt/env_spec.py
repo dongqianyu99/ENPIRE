@@ -24,9 +24,16 @@ logger = logging.getLogger(__name__)
 ENV_SPEC_DIR = Path(__file__).resolve().parent / "env"
 
 # Robot short-name mapping per platform
-_ROBOT_KEY: dict[str, dict[str, str]] = {}
+_ROBOT_KEY: dict[str, dict[str, str]] = {
+    "robocasa": {
+        "PandaOmron": "panda",
+        "GR1ArmsOnly": "gr1",
+    },
+}
 
-_ROBOT_DEFAULT: dict[str, str] = {}
+_ROBOT_DEFAULT: dict[str, str] = {
+    "robocasa": "panda",
+}
 
 
 def _resolve_spec_key(env_name: str) -> str:

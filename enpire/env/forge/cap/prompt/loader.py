@@ -42,11 +42,22 @@ _DEFAULT_ROOT = Path(__file__).resolve().parent
 CATEGORIES = ("system", "tools", "embodiment", "task", "heuristics")
 
 # Env name -> embodiment file stem mapping
-_EMBODIMENT_MAP: dict[str, str] = {}
+_EMBODIMENT_MAP: dict[str, str] = {
+    "robocasa": "robocasa_panda",
+    "robocasa_panda": "robocasa_panda",
+    "robocasa_gr1": "robocasa_gr1",
+}
 
 # Robot short-name mapping (mirrors env_spec.py logic)
-_ROBOT_KEY: dict[str, dict[str, str]] = {}
-_ROBOT_DEFAULT: dict[str, str] = {}
+_ROBOT_KEY: dict[str, dict[str, str]] = {
+    "robocasa": {
+        "PandaOmron": "panda",
+        "GR1ArmsOnly": "gr1",
+    },
+}
+_ROBOT_DEFAULT: dict[str, str] = {
+    "robocasa": "panda",
+}
 
 
 def _resolve_embodiment_stem(env_name: str) -> str:
