@@ -94,6 +94,7 @@ class OpenAICodexBackend(AgentBackend):
         backend="openai_codex",
         label="OpenAI Codex",
         models=(
+            "gpt-6.2-sol",
             "gpt-6.1-sol",
             "gpt-5.4",
             "gpt-5.4-mini",

@@ -232,7 +232,7 @@ def test_tool_free_codex_handles_large_events_and_uses_last_message(monkeypatch,
 
     async def fake_codex(*cmd, cwd, env, **kwargs):
         assert cmd[:4] == ("codex", "exec", "--json", "--color")
-        assert cmd[cmd.index("-m") + 1] == "gpt-6.1-sol"
+        assert cmd[cmd.index("-m") + 1] == "gpt-6.2-sol"
         assert 'model_reasoning_effort="high"' in cmd
         assert Path(cmd[cmd.index("-C") + 1]) == Path(cwd)
         assert list(Path(cwd).iterdir()) == []
@@ -257,7 +257,7 @@ def test_tool_free_codex_handles_large_events_and_uses_last_message(monkeypatch,
     config = SimpleNamespace(
         llm=SimpleNamespace(
             backend="bridge:openai_codex",
-            model="gpt-6.1-sol",
+            model="gpt-6.2-sol",
             reasoning="high",
             bridge_tools=False,
             cap_agent_url="",
@@ -267,7 +267,7 @@ def test_tool_free_codex_handles_large_events_and_uses_last_message(monkeypatch,
     llm = make_llm(config, replace_system_prompt=True)
 
     assert llm.generate_code("task", {}) == "print('final')"
-    assert llm.last_usage == {**usage, "model": "gpt-6.1-sol"}
+    assert llm.last_usage == {**usage, "model": "gpt-6.2-sol"}
 
 
 def test_agent_bridge_options_and_selected_backend_chat(
