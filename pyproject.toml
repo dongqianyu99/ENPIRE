@@ -206,7 +206,7 @@ pyroki = { path = "third_party/pyroki", editable = true }
 nvidia-curobo = { path = "third_party/curobo", editable = true }
 i2rt = { path = "third_party/i2rt", editable = true }
 robocasa = { path = "third_party/robocasa", editable = true }
-robosuite = { git = "https://github.com/ARISE-Initiative/robosuite.git", rev = "v1.5.1" }
+robosuite = { git = "https://github.com/ARISE-Initiative/robosuite.git", rev = "v1.5.2" }
 torch = [
     { index = "pytorch-cu128", marker = "sys_platform == 'linux'" },
 ]
@@ -221,6 +221,10 @@ nvidia-curobo = ["setuptools"]
 environments = ["sys_platform == 'linux'"]
 no-build-isolation-package = ["nvidia-curobo"]
 override-dependencies = [
+    # robosuite 1.5.2 (robocasa extra) pins mink==0.0.5; ENPIRE's planning
+    # stack needs 0.0.12. robosuite only uses mink in its whole-body IK
+    # controller, not the OSC controller RoboCasa uses here.
+    "mink==0.0.12",
     "mujoco>=3.5",
     "numpy>=1.26",
     "PyOpenGL>=3.1.7",

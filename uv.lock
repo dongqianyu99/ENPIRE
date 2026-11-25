@@ -10,6 +10,7 @@ supported-markers = [
 
 [manifest]
 overrides = [
+    { name = "mink", specifier = "==0.0.12" },
     { name = "mujoco", specifier = ">=3.5" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pyopengl", specifier = ">=3.1.7" },
@@ -942,7 +943,7 @@ requires-dist = [
     { name = "requests", marker = "extra == 'vision-local'", specifier = ">=2.32" },
     { name = "requests", marker = "extra == 'vlm'", specifier = ">=2.32" },
     { name = "robocasa", marker = "extra == 'robocasa'", editable = "third_party/robocasa" },
-    { name = "robosuite", marker = "extra == 'robocasa'", git = "https://github.com/ARISE-Initiative/robosuite.git?rev=v1.5.1" },
+    { name = "robosuite", marker = "extra == 'robocasa'", git = "https://github.com/ARISE-Initiative/robosuite.git?rev=v1.5.2" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.9" },
     { name = "scipy", marker = "extra == 'calibration'", specifier = ">=1.15" },
     { name = "scipy", marker = "extra == 'cap'", specifier = ">=1.15" },
@@ -3151,8 +3152,8 @@ requires-dist = [
 
 [[package]]
 name = "robosuite"
-version = "1.5.1"
-source = { git = "https://github.com/ARISE-Initiative/robosuite.git?rev=v1.5.1#a071383d53568ab798eb315c0e95357911be922d" }
+version = "1.5.2"
+source = { git = "https://github.com/ARISE-Initiative/robosuite.git?rev=v1.5.2#824ac14cefcfb7ec125fe5eb2e0bad7364466154" }
 dependencies = [
     { name = "mink" },
     { name = "mujoco" },
@@ -3162,8 +3163,10 @@ dependencies = [
     { name = "pillow" },
     { name = "pynput" },
     { name = "pytest" },
+    { name = "qpsolvers", extra = ["quadprog"] },
     { name = "scipy" },
     { name = "termcolor" },
+    { name = "tqdm" },
 ]
 
 [[package]]
