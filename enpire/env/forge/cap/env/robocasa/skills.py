@@ -1580,7 +1580,7 @@ def make_namespace(
             e.command_arm(side, {"pos": cmd})
             e.step()
             obs = e.get_arm_observation(side)
-            if abs(float(obs["gripper_pos"]) - value) < 0.01:
+            if abs(float(np.asarray(obs["gripper_pos"]).reshape(-1)[0]) - value) < 0.01:
                 return
         # Don't error — partial gripper motion is acceptable
 
