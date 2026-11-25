@@ -19,6 +19,14 @@ inside the script; examples below that call them describe an older runtime.
 - Check progress from what you can observe: the robot state, `get_gripper_info`,
   re-detection, and images.
 - Success is graded outside the script by the simulator after the script ends.
+- `sample_grasp_pose_anygrasp` is not available in this setup (no AnyGrasp server; it raises).
+  Grasp from perception, e.g. top-down at the detected object position.
+- `freespace_move` failures carry a reason. "Start state is colliding with world" means the arm
+  is inside or too close to an obstacle in the planner world, and no plan can start until it
+  moves clear (e.g. a short `nudge_brutal` up) or the nearby bodies are excluded with
+  `update_planner_world(exclude_body_prefixes=[...])`. That selection, and
+  `disable_collision_avoid()` / `enable_collision_avoid()`, apply to all later motions until
+  changed.
 
 ## Tool API
 

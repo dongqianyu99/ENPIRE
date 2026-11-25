@@ -770,6 +770,11 @@ def make_namespace(
     # for existing skill_library/ callers.
     # ------------------------------------------------------------------
 
+    # Planner-world selection set by update_planner_world / enable_ / disable_collision_avoid.
+    # Motions that do not pass their own exclude_body_prefixes use it, so the
+    # selection persists instead of being overwritten by the next motion's reload.
+    _world_exclude: dict[str, list[str] | None] = {"prefixes": None}
+
     def _plan_and_move(
         backend: str,
         target_pos: list[float] | np.ndarray | None,
@@ -831,8 +836,13 @@ def make_namespace(
             # failed update doesn't break the task.
             try:
                 kwargs: dict = {}
-                if exclude_body_prefixes is not None:
-                    kwargs["exclude_body_prefixes"] = list(exclude_body_prefixes)
+                excl = (
+                    exclude_body_prefixes
+                    if exclude_body_prefixes is not None
+                    else _world_exclude["prefixes"]
+                )
+                if excl is not None:
+                    kwargs["exclude_body_prefixes"] = list(excl)
                 collision_data = e.get_collision_geoms(**kwargs)
                 n_obstacles = planner.update_world_from_geoms(collision_data)
                 logger.debug(
@@ -861,10 +871,32 @@ def make_namespace(
 
         status = plan_result.get("status", "Error")
         if status != "Success":
-            return FreespaceResult(
-                status=status,
-                reason=plan_result.get("status_detail", "Planning failed"),
-            )
+            reason = plan_result.get("status_detail") or "Planning failed"
+            if backend_norm == "curobo":
+                # cuRobo v0.8 reports every failure as Planning_Failed. Tell a blocked
+                # start apart from an unreachable goal: if a 1 cm move straight up from
+                # the current pose also fails in the same world, the start is the problem.
+                try:
+                    up_pos_w = np.asarray(obs["ee_pos"], dtype=np.float64) + np.array([0.0, 0.0, 0.01])
+                    up_quat_w = np.asarray(obs.get("ee_quat", [0, 0, 0, 1]), dtype=np.float64)
+                    up_pos_b, up_quat_b = _world_to_base(up_pos_w, up_quat_w)
+                    probe = planner.plan_to_pose(
+                        current_left_jp=np.zeros_like(current_jp),
+                        current_right_jp=current_jp,
+                        target_right_pos=up_pos_b,
+                        target_right_quat_xyzw=up_quat_b,
+                        side="right",
+                    )
+                    if probe.get("status") != "Success":
+                        reason = (
+                            "Start state is colliding with world: the arm is inside or too close "
+                            "to an obstacle in the planner world, so no plan can start from here"
+                        )
+                    else:
+                        reason = f"{reason}: the target is unreachable or blocked (the start is free)"
+                except Exception as exc:  # noqa: BLE001 - diagnosis must not mask the failure
+                    logger.debug("start-state probe failed: %s", exc)
+            return FreespaceResult(status=status, reason=reason)
 
         # Extract trajectory waypoints
         waypoints = np.asarray(plan_result["right_positions"], dtype=np.float64)
@@ -1066,8 +1098,13 @@ def make_namespace(
 
         try:
             kwargs: dict = {}
-            if exclude_body_prefixes is not None:
-                kwargs["exclude_body_prefixes"] = list(exclude_body_prefixes)
+            excl = (
+                exclude_body_prefixes
+                if exclude_body_prefixes is not None
+                else _world_exclude["prefixes"]
+            )
+            if excl is not None:
+                kwargs["exclude_body_prefixes"] = list(excl)
             n = planner.update_world_from_geoms(e.get_collision_geoms(**kwargs))
             logger.debug("select_best_grasp: world updated with %d obstacles", n)
         except Exception as exc:
@@ -2160,6 +2197,10 @@ def make_namespace(
         kwargs = {}
         if exclude_body_prefixes is not None:
             kwargs["exclude_body_prefixes"] = list(exclude_body_prefixes)
+        # Later motions plan against this selection until it is changed again.
+        _world_exclude["prefixes"] = (
+            list(exclude_body_prefixes) if exclude_body_prefixes is not None else None
+        )
         collision_data = _env().get_collision_geoms(**kwargs)
         try:
             n = planner.update_world_from_geoms(collision_data)
@@ -2577,6 +2618,12 @@ def make_namespace(
 
         Returns list of GraspCandidate(position, rpy, score, width).
         """
+        if not _anygrasp_port:
+            raise RuntimeError(
+                "AnyGrasp is not available in this setup (no AnyGrasp server). Build grasps "
+                "from perception instead, e.g. a top-down grasp at the object's detected "
+                "position (detect_objects_oneshot / segment_object + depth)."
+            )
         from enpire.env.forge.cap.env.base.skill_library import sample_grasp_anygrasp
 
         e = _env()
