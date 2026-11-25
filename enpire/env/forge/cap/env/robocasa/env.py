@@ -19,6 +19,7 @@ Usage::
 from __future__ import annotations
 
 import concurrent.futures
+import contextlib
 import math
 import os
 import threading
@@ -34,6 +35,36 @@ import numpy as np
 
 if TYPE_CHECKING:
     from enpire.env.forge.cap.env.profile import RobotProfile
+
+
+@contextlib.contextmanager
+def _seeded_default_rng(seed: int | None):
+    """Make unseeded ``np.random.default_rng()`` calls deterministic while a scene is built.
+
+    robosuite/robocasa seed the kitchen's own generator, but some fixtures and
+    ``robosuite.utils.mjcf_utils.get_size`` fall back to ``np.random.default_rng()``
+    when no generator is passed. Their draws change fixture geometry, which changes
+    how object placement consumes the seeded generator, so the same (seed, layout,
+    style) could produce a different object and placement in each process. Inside
+    this context, an unseeded call gets a seed drawn from a generator seeded with
+    ``seed``. Explicitly seeded calls are untouched. No-op when ``seed`` is None.
+    """
+    if seed is None:
+        yield
+        return
+    original = np.random.default_rng
+    stream = original(seed)
+
+    def default_rng(seed_arg=None, *args, **kwargs):
+        if seed_arg is None:
+            seed_arg = int(stream.integers(2**63))
+        return original(seed_arg, *args, **kwargs)
+
+    np.random.default_rng = default_rng
+    try:
+        yield
+    finally:
+        np.random.default_rng = original
 
 
 class RoboCasaEnv:
@@ -92,23 +123,25 @@ class RoboCasaEnv:
         # Disable robosuite's built-in camera rendering — we use a separate
         # mujoco.Renderer on a dedicated thread (same pattern as SimBackend)
         # to avoid OpenGL context thread-affinity issues.
-        self._env = robosuite.make(
-            env_name,
-            robots=robot,
-            controller_configs=controller_configs,
-            has_renderer=has_renderer,
-            has_offscreen_renderer=False,
-            use_camera_obs=False,
-            camera_heights=camera_height,
-            camera_widths=camera_width,
-            control_freq=control_freq,
-            ignore_done=True,
-            layout_ids=layout_ids,
-            style_ids=style_ids,
-            **robocasa_kwargs,
-        )
+        with _seeded_default_rng(self._seed):
+            self._env = robosuite.make(
+                env_name,
+                robots=robot,
+                controller_configs=controller_configs,
+                has_renderer=has_renderer,
+                has_offscreen_renderer=False,
+                use_camera_obs=False,
+                camera_heights=camera_height,
+                camera_widths=camera_width,
+                control_freq=control_freq,
+                ignore_done=True,
+                layout_ids=layout_ids,
+                style_ids=style_ids,
+                **robocasa_kwargs,
+            )
 
-        self._obs = self._env.reset()
+            self._obs = self._env.reset()
+        self._restore_or_save_scene(env_name, robot, layout_ids, style_ids)
         self._reward: float = 0.0
         self._done: bool = False
         self._info: dict = {}
@@ -538,6 +571,54 @@ class RoboCasaEnv:
         # Store as pending action so step() uses it
         self._pending_eef_action = action
         return {"pos": action}  # command_arm format
+
+    # ------------------------------------------------------------------
+    # Scene cache (identical episodes across processes)
+    # ------------------------------------------------------------------
+
+    def _restore_or_save_scene(self, env_name, robot, layout_ids, style_ids) -> None:
+        """Pin the episode for (task, robot, seed, layout, style) via ``ROBOCASA_SCENE_CACHE``.
+
+        RoboCasa's scene build is not reproducible across processes for a fixed seed:
+        object placement occasionally fails and the kitchen is rebuilt with new
+        objects. With ``ROBOCASA_SCENE_CACHE`` set, the first build of an episode
+        saves the model XML, episode metadata and initial sim state; later builds
+        restore them (RoboCasa's own dataset-playback path), so every iteration and
+        every compared method gets exactly the same episode.
+        """
+        cache_dir = os.environ.get("ROBOCASA_SCENE_CACHE")
+        if not cache_dir or self._seed is None:
+            return
+        import json
+        from pathlib import Path
+
+        key = f"{env_name}_{robot}_seed{self._seed}_layout{layout_ids}_style{style_ids}"
+        path = Path(cache_dir) / f"{key}.npz"
+        env = self._env
+        if not path.is_file():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_name(f"{key}.{os.getpid()}.tmp.npz")
+            np.savez(
+                tmp,
+                model=np.array(env.sim.model.get_xml()),
+                ep_meta=np.array(json.dumps(env.get_ep_meta())),
+                states=np.asarray(env.sim.get_state().flatten()),
+            )
+            os.replace(tmp, path)
+            print(f"[RoboCasaEnv] saved episode {key}")
+        # Always start from the restored scene, also right after saving it, so the
+        # first process sees exactly what later ones see.
+        data = np.load(path, allow_pickle=False)
+        env.set_ep_meta(json.loads(str(data["ep_meta"])))
+        env.reset()
+        env.reset_from_xml_string(env.edit_model_xml(str(data["model"])))
+        env.sim.reset()
+        env.sim.set_state_from_flattened(np.asarray(data["states"]))
+        env.sim.forward()
+        if hasattr(env, "update_state"):
+            env.update_state()
+        self._obs = env._get_observations(force_update=True)
+        print(f"[RoboCasaEnv] restored episode {key}")
 
     # ------------------------------------------------------------------
     # TaskProtocol

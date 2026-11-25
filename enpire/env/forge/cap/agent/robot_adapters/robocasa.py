@@ -93,9 +93,22 @@ class RobocasaAdapter:
             env_kwargs["camera_width"] = kwargs["camera_width"]
 
         env = create_env(resolved_env_name, viewer=kwargs["viewer"], **env_kwargs)
+        # Default VLM for the policy's vlm_query: CAP_POLICY_VLM_BACKEND/_MODEL (run_script
+        # children inherit the environment, not the reflection config), else reflection.*.
+        from enpire.env.forge.cap.agent.robot_adapters.base import cfg_select
+
+        policy_vlm_backend = (
+            os.environ.get("CAP_POLICY_VLM_BACKEND")
+            or cfg_select(cfg, "reflection.vlm_backend", None)
+            or kwargs["vlm_backend"]
+        )
+        policy_vlm_model = os.environ.get("CAP_POLICY_VLM_MODEL") or cfg_select(
+            cfg, "reflection.vlm_model", None
+        )
         namespace = make_namespace(
             env,
-            vlm_backend=kwargs["vlm_backend"],
+            vlm_backend=policy_vlm_backend,
+            vlm_model=policy_vlm_model,
             curobo_host=kwargs["curobo_host"],
             curobo_port=kwargs["curobo_port"],
             cfg=cfg,
