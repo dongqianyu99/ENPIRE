@@ -1,0 +1,48 @@
+diff --git a/robocasa/__init__.py b/robocasa/__init__.py
+index 3780cc5..57631de 100644
+--- a/robocasa/__init__.py
++++ b/robocasa/__init__.py
+@@ -1002,15 +1002,9 @@ from robosuite.robots import ALL_ROBOTS
+ 
+ import mujoco
+ 
+-assert (
+-    mujoco.__version__ == "3.3.1"
+-), "MuJoCo version must be 3.3.1. Please run pip install mujoco==3.3.1"
+ 
+ import numpy
+ 
+-assert numpy.__version__ in [
+-    "2.2.5",
+-], "numpy version must be 2.2.5. Please install this version."
+ 
+ import robosuite
+ 
+diff --git a/setup.py b/setup.py
+index f0cbd62..0c0ac8f 100644
+--- a/setup.py
++++ b/setup.py
+@@ -15,10 +15,10 @@ setup(
+     name="robocasa",
+     packages=[package for package in find_packages() if package.startswith("robocasa")],
+     install_requires=[
+-        "numpy==2.2.5",
+-        "numba==0.61.2",
+-        "scipy==1.15.3",
+-        "mujoco==3.3.1",
++        "numpy>=2.2.5",
++        "numba>=0.61.2",
++        "scipy>=1.15.2",
++        "mujoco>=3.3.1",
+         "pygame",
+         "Pillow",
+         "opencv-python",
+@@ -30,8 +30,6 @@ setup(
+         "h5py",
+         "lxml",
+         "hidapi",
+-        "tianshou==0.4.10",
+-        "lerobot==0.3.3",
+         "gymnasium",
+     ],
+     eager_resources=["*"],

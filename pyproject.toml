@@ -156,6 +156,22 @@ pld = [
     "omegaconf>=2.3",
 ]
 
+# RoboCasa365 simulation (code-as-policy). robocasa is the robocasa365_release
+# submodule with third_party/patches/robocasa365-relax-pins.patch applied (its
+# exact pins and import-time version asserts conflict with this lock; ENPIRE's
+# earlier vendored copy made the same change). Assets are downloaded separately:
+#   python -m robocasa.scripts.download_kitchen_assets
+robocasa = [
+    "gymnasium>=1.2",
+    "hidapi",
+    "huggingface_hub",
+    "numba>=0.61.2",
+    "pynput",
+    "qpsolvers[quadprog]>=4.3.1",
+    "robocasa",
+    "robosuite",
+]
+
 dev = [
     "coverage[toml]>=7.6",
     "evdev>=1.9; sys_platform == 'linux'",
@@ -189,6 +205,8 @@ enpire = ["**/*.md", "**/*.yaml", "**/*.yml", "**/*.json", "**/*.xml", "**/*.stl
 pyroki = { path = "third_party/pyroki", editable = true }
 nvidia-curobo = { path = "third_party/curobo", editable = true }
 i2rt = { path = "third_party/i2rt", editable = true }
+robocasa = { path = "third_party/robocasa", editable = true }
+robosuite = { git = "https://github.com/ARISE-Initiative/robosuite.git", rev = "v1.5.1" }
 torch = [
     { index = "pytorch-cu128", marker = "sys_platform == 'linux'" },
 ]

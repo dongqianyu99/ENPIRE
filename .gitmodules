@@ -1,3 +1,7 @@
 [submodule "third_party/curobo"]
 	path = third_party/curobo
 	url = https://github.com/NVlabs/curobo.git
+[submodule "third_party/robocasa"]
+	path = third_party/robocasa
+	url = https://github.com/robocasa/robocasa.git
+	branch = robocasa365_release
