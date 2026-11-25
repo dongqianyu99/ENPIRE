@@ -115,3 +115,7 @@ third_party/bundlesdf/libs.lfs.bak/
 .forge_env
 .forge_env.secrets
 bundlesdf-*.tar.gz
+
+# RoboCasa seed skill library: restored locally from history, never committed
+# (scripts/restore_robocasa_skill_library.sh).
+enpire/env/forge/cap/saved_scripts/robocasa_skill_library/

@@ -2297,15 +2297,25 @@ def make_namespace(
     def detect_object(
         query: str,
         camera: str = "top",
-        backend: str = "oracle",
+        backend: str | None = None,
         max_retries: int = 3,
     ) -> list[Detection3D]:
-        """Detect objects — oracle mode uses get_task_info, no external server needed.
+        """Detect objects: ``"sam3"`` (SAM3 mask + depth) or ``"oracle"``.
 
-        In oracle mode, fuzzy-matches *query* against object position keys
-        in the env's task info (RoboCasa provides ``*_pos`` keys for all scene
-        objects in the observation dict).
+        The default is ``"sam3"`` in evaluated scripts and ``"oracle"`` elsewhere.
+        Oracle mode fuzzy-matches *query* against the ``*_pos`` keys of the env's
+        task info (simulator ground truth). It is refused in script role, like
+        ``get_task_info``: canonical policy scripts get no oracle object poses.
         """
+        if backend is None:
+            backend = "sam3" if runtime_role == "script" else "oracle"
+        if backend == "sam3":
+            return detect_objects_oneshot(query, camera=camera).get(query, [])
+        if backend == "oracle" and runtime_role == "script":
+            raise RuntimeError(
+                "detect_object(backend='oracle') reads simulator ground truth and is "
+                "not available in evaluated scripts; use backend='sam3' (default)."
+            )
         if backend == "oracle":
             info = _env().get_task_info()
             # RoboCasa task info includes *_pos keys for scene objects
@@ -2350,10 +2360,8 @@ def make_namespace(
                 )
             return detections
 
-        # Non-oracle backends would require external servers
         raise NotImplementedError(
-            f"Detection backend '{backend}' not yet supported in direct mode. "
-            "Use backend='oracle' for RoboCasa ground-truth detection."
+            f"Detection backend '{backend}' is not supported; use 'sam3' or 'oracle'."
         )
 
     # ------------------------------------------------------------------
