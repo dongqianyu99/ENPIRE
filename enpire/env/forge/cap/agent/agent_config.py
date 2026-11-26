@@ -254,6 +254,10 @@ class ReflectionConfig:
     cameras: List[str] = field(default_factory=lambda: ["top"])
     vlm_backend: str = "gemini"
     vlm_model: Optional[str] = None  # None → backend default
+    # Optional dotted path to ``f(*, ctx) -> str`` that replaces the Phase B review
+    # (the reflection strategy output, which becomes the next generator feedback).
+    # Phase A still runs; provider failures stop the iteration.
+    review_provider: Optional[str] = None
     scene_query: str = ""
     analysis_prompt: str = ""
     visual_evidence: VisualEvidenceConfig = field(default_factory=VisualEvidenceConfig)

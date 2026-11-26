@@ -738,6 +738,8 @@ class RoboCasaEnv:
             "reward": float(success),
             "success": success,
             "env_name": self._env_name,
+            # The episode's instruction (public; also what get_task_description() returns).
+            "task_description": self._task_description,
         }
         # Include object positions from obs (for scripting without vision)
         with self._lock:
