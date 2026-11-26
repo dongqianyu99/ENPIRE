@@ -226,8 +226,10 @@ class OpenAICodexBackend(AgentBackend):
                 env = {
                     key: os.environ[key] for key in ("HOME", "CODEX_HOME", "PATH") if key in os.environ
                 }
+            # The prompt goes on stdin ("-"): as an argv entry it fails past Linux's 128 KiB
+            # per-argument limit (E2BIG), which long feedback and skill responses reach.
             cmd = self.build_command(
-                message=wrapped_message,
+                message="-",
                 session_id=session.session_id,
                 config=config,
                 context=context,
@@ -237,7 +239,7 @@ class OpenAICodexBackend(AgentBackend):
             try:
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
-                    stdin=asyncio.subprocess.DEVNULL,
+                    stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     limit=1024 * 1024,  # A Codex JSON line can contain an entire policy script.
@@ -252,6 +254,14 @@ class OpenAICodexBackend(AgentBackend):
                     },
                 )
                 return TurnResult(full_text="", session_id=session.session_id)
+
+            if process.stdin is None:
+                raise RuntimeError(
+                    "codex subprocess stdin is None — check Popen configuration"
+                )
+            process.stdin.write(wrapped_message.encode("utf-8"))
+            await process.stdin.drain()
+            process.stdin.close()
 
             if process.stdout is None:
                 raise RuntimeError(
