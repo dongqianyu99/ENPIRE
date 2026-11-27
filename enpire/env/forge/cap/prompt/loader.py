@@ -31,12 +31,24 @@ Usage::
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Literal
 
 # Default root: cap/prompt/ relative to this file's location
 _DEFAULT_ROOT = Path(__file__).resolve().parent
+
+# Embodiment files can carry two variants of their grasp-sampler notes:
+#   <!-- grasp:on -->...<!-- /grasp -->   kept when a grasp server serves sample_grasp_pose_anygrasp
+#   <!-- grasp:off -->...<!-- /grasp -->  kept otherwise
+# ENPIRE_GRASP_BACKEND names the server (anygrasp, contact_graspnet); unset or "off" means none.
+_GRASP_BLOCK = re.compile(r"<!-- grasp:(on|off) -->\n?(.*?)<!-- /grasp -->\n?", re.S)
+
+
+def _select_grasp_blocks(text: str) -> str:
+    on = os.environ.get("ENPIRE_GRASP_BACKEND", "off").strip().lower() not in ("", "off", "0", "none")
+    return _GRASP_BLOCK.sub(lambda m: m.group(2) if (m.group(1) == "on") == on else "", text)
 
 # Subfolder categories
 CATEGORIES = ("system", "tools", "embodiment", "task", "heuristics")
@@ -294,7 +306,7 @@ class PromptMemory:
         if not path.exists():
             return None
 
-        text = path.read_text(encoding="utf-8")
+        text = _select_grasp_blocks(path.read_text(encoding="utf-8"))
         tool_docs = _extract_section(text, "Tool API")
         env_notes = _extract_section(text, "Environment Notes")
 

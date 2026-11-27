@@ -19,8 +19,16 @@ inside the script; examples below that call them describe an older runtime.
 - Check progress from what you can observe: the robot state, `get_gripper_info`,
   re-detection, and images.
 - Success is graded outside the script by the simulator after the script ends.
+<!-- grasp:off -->
 - `sample_grasp_pose_anygrasp` is not available in this setup (no AnyGrasp server; it raises).
   Grasp from perception, e.g. top-down at the detected object position.
+<!-- /grasp -->
+<!-- grasp:on -->
+- `sample_grasp_pose_anygrasp` is available: it segments the object with SAM3 and samples
+  ranked 6-DoF grasp candidates from that camera's depth (world-frame position, rpy, width).
+  Candidates are not checked for reachability; plan to each and fall back to the next. Scores
+  only rank candidates within one call.
+<!-- /grasp -->
 - `freespace_move` failures carry a reason. "Start state is colliding with world" means the arm
   is inside or too close to an obstacle in the planner world, and no plan can start until it
   moves clear (e.g. a short `nudge_brutal` up) or the nearby bodies are excluded with
