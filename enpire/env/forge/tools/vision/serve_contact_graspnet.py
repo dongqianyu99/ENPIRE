@@ -23,8 +23,11 @@ Per request:
    - Contact-GraspNet pose: x = closing axis, z = approach, origin at the gripper base, with
      the fingertip baseline 0.1034 m along z;
    - AnyGrasp pose: x = approach, y = closing axis, origin between the fingers;
-   - so R_any = [z, x, y] and t_any = t + 0.1034 z.
-   The client then applies the same AnyGrasp-to-gripper rotation it uses for AnyGrasp.
+   - so R_any = [z, x, y] and t_any = t + (0.1034 + extra_depth) z.
+   On the RoboCasa sink objects the model puts contacts on the camera-facing top surface and
+   predicts small openings (9-13 mm), so the pads can close above the object's widest part.
+   ``--extra-depth`` moves the pose further along the approach. It is experimental: in the
+   2026-11-27 probe (scripts/grasp_probe.py, 4 kitchens), neither 2 nor 4 cm produced a lift.
 4. If ``--top-down`` is set (the default, like AnyGrasp's top-down mode), keep grasps whose
    approach is within 60 deg of the camera's viewing direction. If none qualify, keep all.
 5. Greedy NMS (2 cm, 30 deg), sort by score and return ``max_grasps``.
@@ -68,6 +71,7 @@ _CKPT: str | None = None
 _FORWARD_PASSES = 1
 _TOP_DOWN = True
 _TOP_DOWN_COS = 0.5  # cos(60 deg)
+_EXTRA_DEPTH_M = 0.0  # push past the predicted contacts along the approach (see --extra-depth)
 _LOCK = threading.Lock()  # one GPU inference at a time
 
 
@@ -107,12 +111,16 @@ def _b64_to_np(s: str) -> np.ndarray:
     return np.load(io.BytesIO(base64.b64decode(s)), allow_pickle=False)
 
 
-def cgn_to_anygrasp(grasps: np.ndarray) -> np.ndarray:
-    """Contact-GraspNet poses (N,4,4) -> AnyGrasp-convention poses, both in the camera frame."""
+def cgn_to_anygrasp(grasps: np.ndarray, extra_depth_m: float = 0.0) -> np.ndarray:
+    """Contact-GraspNet poses (N,4,4) -> AnyGrasp-convention poses, both in the camera frame.
+
+    The origin moves to the fingertip baseline (0.1034 m along the approach), plus
+    ``extra_depth_m`` further along the approach.
+    """
     out = np.tile(np.eye(4), (len(grasps), 1, 1))
     x, y, z = grasps[:, :3, 0], grasps[:, :3, 1], grasps[:, :3, 2]
     out[:, :3, 0], out[:, :3, 1], out[:, :3, 2] = z, x, y  # approach, closing, normal
-    out[:, :3, 3] = grasps[:, :3, 3] + GRIPPER_DEPTH_M * z
+    out[:, :3, 3] = grasps[:, :3, 3] + (GRIPPER_DEPTH_M + extra_depth_m) * z
     return out
 
 
@@ -196,7 +204,16 @@ def _plan(req: PlanRequest) -> tuple[np.ndarray, np.ndarray, np.ndarray, bytes]:
     if n_raw == 0:
         logger.warning("Contact-GraspNet returned no grasps")
         return (*empty, _overlay(rgb, mask, K, empty[0], empty[2]))
-    g = cgn_to_anygrasp(g)
+    c = np.asarray(_contacts.get(seg_key, np.empty((0, 3))), dtype=np.float64).reshape(-1, 3)
+    if len(c) == len(g):  # where the predicted contacts lie along each grasp's approach, from its origin
+        along = np.einsum("ij,ij->i", c - g[:, :3, 3], g[:, :3, 2])
+        logger.info("contact depth along approach: mean=%.4f min=%.4f max=%.4f (model frame; fingertip baseline %.4f); "
+                    "openings mean=%.4f", along.mean(), along.min(), along.max(), GRIPPER_DEPTH_M, w.mean())  # fmt: skip
+        from scipy.spatial import cKDTree
+
+        d, _ = cKDTree(np.asarray(pc_segments[seg_key])[:, :3]).query(c)
+        logger.info("contact to nearest object point: median=%.4f max=%.4f m", float(np.median(d)), float(d.max()))
+    g = cgn_to_anygrasp(g, _EXTRA_DEPTH_M)
     if _TOP_DOWN:
         top = g[:, 2, 0] >= _TOP_DOWN_COS  # approach . camera viewing direction (+z)
         if top.any():
@@ -230,7 +247,8 @@ def plan_viz_endpoint(req: PlanRequest) -> PlanVizResponse:
 @app.get("/health")
 def health() -> dict[str, Any]:
     return {"status": "ok", "backend": "contact_graspnet", "model_loaded": _ESTIMATOR is not None,
-            "checkpoint_path": _CKPT, "top_down_grasp": _TOP_DOWN, "detection_only": True}  # fmt: skip
+            "checkpoint_path": _CKPT, "top_down_grasp": _TOP_DOWN, "extra_depth_m": _EXTRA_DEPTH_M,
+            "detection_only": True}  # fmt: skip
 
 
 @app.post("/reset_state")
@@ -268,7 +286,7 @@ def load_estimator(cgn_root: Path, ckpt_dir: str, forward_passes: int) -> Any:
 
 
 def main() -> None:
-    global _ESTIMATOR, _CKPT, _FORWARD_PASSES, _TOP_DOWN
+    global _ESTIMATOR, _CKPT, _FORWARD_PASSES, _TOP_DOWN, _EXTRA_DEPTH_M
 
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--cgn-root", type=Path, default=Path(os.environ.get("CGN_ROOT", "~/repos/contact_graspnet_pytorch")).expanduser())
@@ -276,10 +294,12 @@ def main() -> None:
     ap.add_argument("--port", type=int, default=8122)
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--forward-passes", type=int, default=2, help="more passes sample more contacts")
+    ap.add_argument("--extra-depth", type=float, default=_EXTRA_DEPTH_M,
+                    help="metres past the predicted contacts along the approach (AnyGrasp-like depth)")
     ap.add_argument("--top-down", dest="top_down", action="store_true", default=True)
     ap.add_argument("--no-top-down", dest="top_down", action="store_false")
     a = ap.parse_args()
-    _FORWARD_PASSES, _TOP_DOWN = a.forward_passes, a.top_down
+    _FORWARD_PASSES, _TOP_DOWN, _EXTRA_DEPTH_M = a.forward_passes, a.top_down, a.extra_depth
     logger.info("loading Contact-GraspNet from %s", a.cgn_root / a.ckpt_dir)
     _ESTIMATOR = load_estimator(a.cgn_root, a.ckpt_dir, a.forward_passes)
     _CKPT = str(a.cgn_root / a.ckpt_dir)
